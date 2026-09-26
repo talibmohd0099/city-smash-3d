@@ -1,0 +1,15 @@
+{
+  "name": "city-smash-3d",
+  "version": "1.0.0",
+  "description": "A 3D city-destroying monster game, packaged as an Android app with Capacitor",
+  "scripts": {
+    "sync": "cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/core": "^6.1.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.2"
+  }
+}
