@@ -15,11 +15,15 @@ A fast, casual 3D monster-rampage game built with [Three.js](https://threejs.org
 - `android/` — the Capacitor-generated Android project
 - `.github/workflows/build-apk.yml` — builds a debug APK on every push to `main`
 
-## Building the APK yourself
+## Getting the APK
 
-1. Push a change to `main` (or run the workflow manually from the **Actions** tab).
-2. Once it finishes, open the **city-smash-3d-debug-apk** artifact on that run and download `app-debug.apk`.
-3. Copy it to an Android phone and install it (you'll need to allow installs from unknown sources).
+Every push to `main` builds a fresh debug APK, automatically:
+
+- **Easiest — Releases:** go to the [Releases page](https://github.com/talibmohd0099/city-smash-3d/releases), open the latest one, and download `city-smash-3d.apk` directly.
+- **Alternative — Actions artifact:** open the **Actions** tab, click the latest successful **Build APK** run, and download the `city-smash-3d-debug-apk` artifact (comes zipped) from the bottom of the page.
+
+Either way, copy the APK to an Android phone and install it (you'll need to allow installs from unknown sources).
+
 
 ### Building locally
 
