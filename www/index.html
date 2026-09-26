@@ -166,8 +166,29 @@ const sfx = {
     g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.001,t+dur);
     o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+dur+0.02);
   },
-  thud(){ this.tone(140,40,0.35,0.7); this.noise(0.35,500,0.5); },
-  crumble(){ const n=performance.now(); if(n-(this._c||0)<90) return; this._c=n; this.noise(0.7,1100,0.35); },
+  bend(f0,f1,f2,dur,vol){
+    const c=this.ctx; if(!c||this.muted) return;
+    const t=c.currentTime, o=c.createOscillator(), g=c.createGain();
+    o.type='sine';
+    o.frequency.setValueAtTime(f0,t);
+    o.frequency.exponentialRampToValueAtTime(f1,t+dur*0.18);
+    o.frequency.exponentialRampToValueAtTime(f2,t+dur);
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(vol,t+dur*0.12);
+    g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+dur+0.03);
+  },
+  thud(punch){
+    const p=clamp(punch||0,0,1);
+    this.bend(85-p*20,230+p*70,40-p*15,0.3+p*0.15,0.55+p*0.2);
+    this.noise(0.3+p*0.15,450-p*150,0.45+p*0.2);
+  },
+  crumble(){ const n=performance.now(); if(n-(this._c||0)<90) return; this._c=n; this.noise(0.14,1500,0.18); },
+  pop(size){
+    const s=clamp(size||0,0,1);
+    this.bend(650-s*380,1150-s*500,220-s*130,0.26+s*0.22,0.4+s*0.25);
+    if(s>0.3) this.noise(0.25+s*0.3,800-s*450,0.3+s*0.25);
+  },
   hit(){ this.tone(320,90,0.15,0.25,'square'); },
   boom(){ this.noise(0.6,1800,0.45); this.tone(90,30,0.5,0.5); },
   shot(){ this.tone(900,500,0.08,0.05,'square'); }
@@ -351,11 +372,12 @@ function destroyHeli(h){
 }
 
 /* ---------- game state ---------- */
-const game={state:'start',time:90,score:0,hp:100,size:1,vis:1,destroyed:0,combo:1,lastKill:-9,cd:0,hop:0,squash:0,heliT:0,shake:0,ended:0,toasted:{}};
+const game={state:'start',time:90,score:0,hp:100,size:1,vis:1,destroyed:0,combo:1,lastKill:-9,cd:0,hop:0,squash:0,heliT:0,shake:0,zoom:0,ended:0,toasted:{}};
 const camBase=new THREE.Vector3(60,45,60), shakeV=new THREE.Vector3(), lookAt=new THREE.Vector3();
 let orbitA=0;
 
 function addShake(v){ game.shake=Math.min(1, game.shake + v*(reduceMotion?0.3:1)); }
+function addZoom(v){ game.zoom=Math.min(1, game.zoom + v*(reduceMotion?0.3:1)); }
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),1600); }
 function popup(text,pos,cls){
   const v=pos.clone().project(camera); if(v.z>1) return;
@@ -386,7 +408,8 @@ function collapse(b){
   addScore(b.value,new THREE.Vector3(b.x,b.h+1,b.z));
   game.size=Math.min(2.4, 1+game.destroyed*0.03);
   for(const th of [1.5,2,2.4]) if(game.size>=th && !game.toasted[th]){ game.toasted[th]=1; toast('The monster grew bigger!'); }
-  addShake(0.22); sfx.crumble();
+  const sizeFactor=clamp(b.h/18,0,1);
+  addShake(0.14+sizeFactor*0.32); addZoom(0.12+sizeFactor*0.38); sfx.pop(sizeFactor);
   if(game.destroyed>=buildings.length) endGame('all');
 }
 function hurt(n){
@@ -411,11 +434,11 @@ function land(){
     if(d<R*1.2 && h.g.position.y<top+4) destroyHeli(h);
   }
   for(let i=0;i<6;i++){ const a=i/6*Math.PI*2; spawnDust(mp.x+Math.cos(a)*2*game.vis,0.8,mp.z+Math.sin(a)*2*game.vis,1.2*game.vis); }
-  game.squash=0.18; addShake(0.55); sfx.thud();
+  game.squash=0.18; addShake(0.55); sfx.thud(clamp((game.size-1)/1.4,0,1));
 }
 
 function resetGame(){
-  Object.assign(game,{state:'play',time:90,score:0,hp:100,size:1,vis:1,destroyed:0,combo:1,lastKill:-9,cd:0,hop:0,squash:0,heliT:4,shake:0,toasted:{}});
+  Object.assign(game,{state:'play',time:90,score:0,hp:100,size:1,vis:1,destroyed:0,combo:1,lastKill:-9,cd:0,hop:0,squash:0,heliT:4,shake:0,zoom:0,toasted:{}});
   for(const b of buildings){ b.state='alive'; b.hp=b.maxHp; b.g.visible=true; b.g.position.set(b.x,0.3,b.z); b.g.rotation.set(0,0,0); b.pile.visible=false; }
   for(const h of helis) scene.remove(h.g); helis=[];
   for(const p of debris){ p.m.visible=false; p.life=0; }
@@ -548,6 +571,7 @@ function updatePlay(dt){
 
   // camera
   let k=0.85+game.vis*0.4; if(innerWidth<innerHeight) k*=1.25;
+  k *= 1 - game.zoom*0.22;
   camBase.lerp(tmp.set(mp.x,12*k+2,mp.z+12*k),1-Math.exp(-dt*4));
   lookAt.set(mp.x,2.2*game.vis,mp.z-1);
 
@@ -598,6 +622,7 @@ function updateWorld(dt){
   } else ring.material.opacity=0;
 
   game.shake=Math.max(0,game.shake-dt*2.2);
+  game.zoom=Math.max(0,game.zoom-dt*2.4);
   const sh=game.shake*game.shake*1.2;
   shakeV.set(rand(-1,1)*sh,rand(-1,1)*sh,rand(-1,1)*sh);
   camera.position.copy(camBase).add(shakeV);
