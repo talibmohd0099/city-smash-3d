@@ -477,7 +477,7 @@ function pose(m,mode,ph,t,dt){
 const G=32, V0=12, G_HOLD=16, HOLD_MAX=0.3; // gravity, jump speed, lighter gravity while JUMP is held
 const COYOTE=0.1, BUFFER=0.14;               // late-jump grace after an edge, early-press memory before landing
 const STEP=0.6, MANTLE=1.3;                  // walk up a ledge this high; climb one up to this high
-const SLIDE_T=0.65, BODY_H=1.8, SLIDE_H=0.9;
+const SLIDE_T=0.65, BODY_H=1.8, SLIDE_H=0.9, LANE_T=0.22; // LANE_T: seconds for one lane change
 const levelSpeed = n => Math.min(16, 11+(n-1)*0.45);
 // how far a jump carries (from take-off to landing dh metres higher) at a given running speed; 0 = can't reach
 function reach(dh,hold,speed){
@@ -636,7 +636,7 @@ let dustIdx=0;
 function spawnDust(x,y,z,s){ const p=dust[dustIdx]; dustIdx=(dustIdx+1)%dust.length; p.m.position.set(x,y,z); p.t=1; p.s=s; p.m.visible=true; }
 
 /* ---------- game state ---------- */
-const P={s:0,x:0,y:12,vy:0,lane:1,onGround:true,cur:null,coyote:0,buffer:0,holdT:0,slideT:0,slow:1,stumbleT:0,mantleT:0,ph:0};
+const P={s:0,x:0,y:12,vy:0,lane:1,lx0:0,lt:1,ld:0,onGround:true,cur:null,coyote:0,buffer:0,holdT:0,slideT:0,slow:1,stumbleT:0,mantleT:0,ph:0};
 const game={state:'start',level:1,builtLevel:0,t:0,speed:11,chase:0.6,coins:0,stumbles:0,score:0,lastTop:12,lastGroundT:0,camX:0,camY:12,
   shake:0,whistleT:-9,overT:0,reason:'',hinted:{},copS:0,copPh:0};
 const hist=[];
@@ -681,7 +681,14 @@ function slide(){
   if(P.onGround){ if(P.slideT<=0) sfx.slide(); P.slideT=SLIDE_T; }
   else { P.vy=Math.min(P.vy,-16); P.slideT=SLIDE_T+0.25; } // in the air: drop fast, then slide
 }
-function shiftLane(d){ if(game.state!=='play') return; const l=clamp(P.lane+d,0,2); if(l!==P.lane){ P.lane=l; sfx.swish(); } }
+function shiftLane(d){
+  if(game.state!=='play') return;
+  const l=clamp(P.lane+d,0,2); if(l===P.lane) return;
+  // an eased side-step from wherever the runner is now, so a second swipe mid-step carries on smoothly
+  P.lane=l; P.lx0=P.x; P.lt=0; P.ld=LANE_T*clamp(Math.abs(laneX(l)-P.x)/LANE,0.6,1.4);
+  sfx.swish();
+  if(P.onGround) spawnDust(P.x-d*0.3,P.y+0.2,-P.s+0.3,0.3);
+}
 function stumble(pos){
   game.stumbles++; game.chase-=0.45; P.slow=0.4; P.stumbleT=0.5;
   sfx.stumble(); addShake(0.35); popup('Ouch!',pos,'bad');
@@ -697,14 +704,14 @@ function land(u){
 
 function resetRun(){
   const oldZ=-P.s, oldY=P.y;
-  Object.assign(P,{s:0,x:0,y:route[0].top,vy:0,lane:1,onGround:true,cur:surfaces[0],coyote:0,buffer:0,holdT:0,slideT:0,slow:0,stumbleT:0,mantleT:0,ph:0});
+  Object.assign(P,{s:0,x:0,y:route[0].top,vy:0,lane:1,lx0:0,lt:1,ld:0,onGround:true,cur:surfaces[0],coyote:0,buffer:0,holdT:0,slideT:0,slow:0,stumbleT:0,mantleT:0,ph:0});
   // the level restarts at s=0, so shift the camera's starting point along with the runner
   camFrom.copy(camBase); camFrom.z+=-P.s-oldZ; camFrom.y+=P.y-oldY; lookFrom.copy(lookAt); lookFrom.z+=-P.s-oldZ; lookFrom.y+=P.y-oldY;
   Object.assign(game,{t:0,speed:levelSpeed(game.level),chase:0.6,coins:0,stumbles:0,score:0,lastTop:P.y,lastGroundT:0,camX:0,camY:P.y,overT:0,reason:'',whistleT:-9,copS:-6,wonT:0});
   hist.length=0;
   for(const o of obstacles) o.hit=false;
   for(const c of coinsD) c.got=false;
-  runner.root.rotation.set(0,Math.PI,0);
+  runner.root.rotation.set(0,Math.PI,0); Object.assign(leanR,{x:0,roll:0,yaw:0,hop:0}); Object.assign(leanC,{x:0,roll:0,yaw:0,hop:0});
   layoutScenery(0); layoutCars(0);
 }
 function startRun(){
@@ -843,7 +850,8 @@ function updatePlay(dt){
   P.slow=Math.min(1,P.slow+dt*1.4);
   const spd=game.speed*P.slow, prevS=P.s, prevY=P.y;
   P.s+=spd*dt;
-  P.x+=(laneX(P.lane)-P.x)*Math.min(1,dt*14);
+  if(P.lt<P.ld){ P.lt+=dt; const p=Math.min(1,P.lt/P.ld); P.x=P.lx0+(laneX(P.lane)-P.lx0)*(0.5-0.5*Math.cos(Math.PI*p)); }
+  else P.x=laneX(P.lane);
   P.coyote-=dt; P.buffer-=dt; P.slideT-=dt; P.stumbleT-=dt; P.mantleT-=dt;
 
   // jump: pressed a moment early still counts on landing, and a moment late still counts after an edge
@@ -961,7 +969,7 @@ function updateActors(dt){
   P.ph+=dt*(4+game.speed*P.slow*0.6);
   pose(runner,mode,P.ph,now,dt);
   runner.root.position.set(P.x,P.y,-P.s);
-  runner.root.rotation.y=Math.PI-clamp((laneX(P.lane)-P.x)*0.15,-0.4,0.4);
+  sideLean(runner,leanR,P.x,dt,P.onGround&&mode!=='slide');
 
   // police: replays your path a little behind you
   let copMode='run';
@@ -978,8 +986,22 @@ function updateActors(dt){
   game.copPh+=Math.max(0,cp.s-game.copS)*0.55; game.copS=cp.s;
   pose(cop,copMode,game.copPh,now,dt);
   cop.root.position.set(cp.x,cp.y,-cp.s);
+  sideLean(cop,leanC,cp.x,dt,!cp.air&&copMode!=='slide');
 }
 
+// lean into sideways movement: bank towards it, turn a little, hop off the ground and put the arms out
+const leanR={x:0,roll:0,yaw:0,hop:0}, leanC={x:0,roll:0,yaw:0,hop:0};
+function sideLean(m,st,x,dt,grounded){
+  const vx=dt>0?(x-st.x)/dt:0; st.x=x;
+  const k=Math.min(1,dt*12);
+  st.roll+=(clamp(vx*0.02,-0.38,0.38)-st.roll)*k;
+  st.yaw+=(clamp(vx*0.022,-0.45,0.45)-st.yaw)*k;
+  st.hop+=((grounded?clamp(Math.abs(vx)*0.008,0,0.16):0)-st.hop)*k;
+  m.root.rotation.set(0,Math.PI-st.yaw,st.roll);
+  m.root.position.y+=st.hop;
+  const spread=Math.abs(st.roll)*1.3;
+  m.armL.rotation.z=-spread; m.armR.rotation.z=spread;
+}
 function updateWorld(dt){
   const pz=-P.s, now=performance.now()/1000;
   // recycle the street and scenery ahead of the runner

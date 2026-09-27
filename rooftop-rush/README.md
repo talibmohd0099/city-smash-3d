@@ -23,6 +23,7 @@ It is a separate, self-contained page (`rooftop-rush/index.html`). Nothing else 
 
 ## How the physics works
 
+- Changing lanes is a 0.22 s eased side-step. The runner banks into it, turns slightly, hops and puts the arms out. A second swipe mid-step carries on smoothly from wherever the runner is.
 - Forward speed is constant per level (11 m/s at level 1, up to 16 m/s). Jumping uses a take-off speed and gravity, with lighter gravity while JUMP is held (up to 0.3 s) for the long jump.
 - Every frame the game finds the rooftop or plank under the runner to decide between standing, falling and landing. Crossing the front wall of a higher roof means a step up (up to 0.6 m), a ledge climb (up to 1.3 m), or a bonk.
 - A short grace period lets a jump still count just after running off an edge, and a press just before landing is remembered.
