@@ -69,6 +69,7 @@ h2{margin:0 0 6px;font-size:30px;line-height:1.1;font-weight:800}
 .btn:active{transform:translateY(4px);box-shadow:0 1px 0 var(--ink)}
 .btn:focus-visible,#mute:focus-visible,#stomp:focus-visible{outline:3px dashed var(--teal);outline-offset:4px}
 .hidden{display:none!important}
+.link{margin-top:12px;font:inherit;font-weight:700;font-size:15px;background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer}
 
 .pop{position:fixed;left:0;top:0;font-weight:800;font-size:22px;color:#FFF3C4;white-space:nowrap;
   -webkit-text-stroke:1.5px var(--ink);text-shadow:0 3px 0 var(--ink);pointer-events:none;animation:rise .9s ease-out forwards}
@@ -96,7 +97,7 @@ h2{margin:0 0 6px;font-size:30px;line-height:1.1;font-weight:800}
   </div>
   <div class="row">
     <div class="chip hp" aria-label="Monster's power"><div id="hpfill"></div><span>Power</span></div>
-    <div class="chip" id="pct">0% destroyed</div>
+    <div class="chip" id="pctChip"><span id="pct">0% destroyed</span><small id="lvl">Level 1</small></div>
   </div>
 </div>
 
@@ -110,11 +111,13 @@ h2{margin:0 0 6px;font-size:30px;line-height:1.1;font-weight:800}
   <div class="card">
     <h1>CITY SMASH</h1>
     <div class="sub">3D Rampage</div>
-    <p>You've got 90 seconds to wreck as much of the city as you can. The more buildings you flatten, the bigger your monster grows.</p>
+    <p id="startLevel" class="sub" style="margin:0 0 8px">Level 1</p>
+    <p>You've got 90 seconds to smash every building in the city. The more buildings you flatten, the bigger your monster grows.</p>
     <p id="controlsText">Touch and drag anywhere to move. Tap SMASH! to slam the ground and shake nearby buildings apart.</p>
     <p>Watch out for helicopter gunfire.</p>
     <p id="bestStart" class="hidden"></p>
     <button class="btn" id="startBtn">Start Game</button>
+    <p><button class="link hidden" id="restartBtn">Start over from Level 1</button></p>
   </div>
 </div>
 
@@ -255,9 +258,19 @@ function buildingGeo(w,h,d){
   uv.needsUpdate=true; geo.translate(0,h/2,0); return geo;
 }
 
+/* ---------- levels ---------- */
+// Level 1 has ~130 buildings. Every level after that is GROWTH bigger (more buildings)
+// and harder (more, faster-firing helicopters) than the one before it.
+const GROWTH=0.025, BASE_BUILDINGS=130, LEVEL_TIME=90;
+const levelScale = n => Math.pow(1+GROWTH, n-1);
+const levelBuildings = n => Math.round(BASE_BUILDINGS*levelScale(n));
+
 /* ---------- city ---------- */
-const BLOCK=12, ROAD=5, N=3, STEP=BLOCK+ROAD, LIMIT=(N+0.5)*STEP+6;
+const BLOCK=12, ROAD=5, STEP=BLOCK+ROAD, MAX_RING=8;
+let LIMIT=3.5*STEP+6;
 const buildings=[];
+let city=null;
+const trunkMat=new THREE.MeshLambertMaterial({color:0x7A4E2D}), leafMat=new THREE.MeshLambertMaterial({color:0x3E8E4E});
 function addBuilding(x,z,w,d,h){
   const ci=Math.floor(Math.random()*PALETTE.length);
   const g=new THREE.Group(); g.position.set(x,0.3,z);
@@ -266,35 +279,56 @@ function addBuilding(x,z,w,d,h){
     const t=new THREE.Mesh(tankGeo,tankMat);
     t.position.set(rand(-.5,.5)*(w-1.2), h+0.4, rand(-.5,.5)*(d-1.2)); t.castShadow=true; g.add(t);
   }
-  scene.add(g);
+  city.add(g);
   const pile=new THREE.Mesh(new THREE.ConeGeometry(Math.max(w,d)*0.62,1.3,4), debrisMats[ci]);
-  pile.rotation.y=Math.PI/4; pile.position.set(x,0.95,z); pile.visible=false; pile.receiveShadow=true; scene.add(pile);
+  pile.rotation.y=Math.PI/4; pile.position.set(x,0.95,z); pile.visible=false; pile.receiveShadow=true; city.add(pile);
   const hp=h*6+10;
   buildings.push({g,x,z,w,d,h,hp,maxHp:hp,ci,pile,state:'alive',shake:0,fallT:0,
     tilt:Math.random()<.5?-1:1,value:Math.round(h*10+20)});
 }
 function addPark(cx,cz){
-  const trunk=new THREE.MeshLambertMaterial({color:0x7A4E2D}), leaf=new THREE.MeshLambertMaterial({color:0x3E8E4E});
   for(let i=0;i<7;i++){
     const a=rand(0,Math.PI*2), r=rand(2.5,5);
-    const t=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.25,1,6),trunk);
-    const l=new THREE.Mesh(new THREE.ConeGeometry(1,2.2,7),leaf);
+    const t=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.25,1,6),trunkMat);
+    const l=new THREE.Mesh(new THREE.ConeGeometry(1,2.2,7),leafMat);
     t.position.set(cx+Math.cos(a)*r,0.8,cz+Math.sin(a)*r); l.position.set(t.position.x,2.3,t.position.z);
-    l.castShadow=true; scene.add(t,l);
+    l.castShadow=true; city.add(t,l);
   }
 }
-for(let bx=-N;bx<=N;bx++) for(let bz=-N;bz<=N;bz++){
-  const cx=bx*STEP, cz=bz*STEP, park=bx===0&&bz===0;
-  const pad=new THREE.Mesh(new THREE.BoxGeometry(BLOCK,0.3,BLOCK), park?parkMat:padMat);
-  pad.position.set(cx,0.15,cz); pad.receiveShadow=true; scene.add(pad);
-  if(park){ addPark(cx,cz); continue; }
-  const dist=Math.hypot(bx,bz);
-  for(const ox of [-1,1]) for(const oz of [-1,1]){
-    if(Math.random()<0.15) continue;
-    const lot=BLOCK/2, w=lot-1.2-rand(0,1.4), d=lot-1.2-rand(0,1.4);
-    const h=3+Math.pow(Math.random(),1.6)*11+dist*0.9;
-    addBuilding(cx+ox*BLOCK/4, cz+oz*BLOCK/4, w, d, h);
+function buildCity(level){
+  if(city){
+    scene.remove(city);
+    city.traverse(o=>{ if(o.geometry && o.geometry!==tankGeo) o.geometry.dispose(); });
   }
+  city=new THREE.Group(); scene.add(city);
+  buildings.length=0;
+  // Fill the lots closest to the central park first (with a little jitter for a ragged
+  // skyline edge), so the city grows outward ring by ring as levels get bigger.
+  const lots=[];
+  for(let bx=-MAX_RING;bx<=MAX_RING;bx++) for(let bz=-MAX_RING;bz<=MAX_RING;bz++){
+    if(bx===0&&bz===0) continue;
+    for(const ox of [-1,1]) for(const oz of [-1,1]){
+      const x=bx*STEP+ox*BLOCK/4, z=bz*STEP+oz*BLOCK/4;
+      lots.push({bx,bz,x,z,key:Math.hypot(x,z)+rand(0,STEP*0.8)});
+    }
+  }
+  lots.sort((a,b)=>a.key-b.key);
+  const used=new Set(['0,0']);
+  let ring=1;
+  for(const lot of lots.slice(0,levelBuildings(level))){
+    const lw=BLOCK/2, w=lw-1.2-rand(0,1.4), d=lw-1.2-rand(0,1.4);
+    const h=3+Math.pow(Math.random(),1.6)*11+Math.hypot(lot.bx,lot.bz)*0.9;
+    addBuilding(lot.x, lot.z, w, d, h);
+    used.add(lot.bx+','+lot.bz);
+    ring=Math.max(ring,Math.abs(lot.bx),Math.abs(lot.bz));
+  }
+  for(const k of used){
+    const [bx,bz]=k.split(',').map(Number), park=bx===0&&bz===0;
+    const pad=new THREE.Mesh(new THREE.BoxGeometry(BLOCK,0.3,BLOCK), park?parkMat:padMat);
+    pad.position.set(bx*STEP,0.15,bz*STEP); pad.receiveShadow=true; city.add(pad);
+    if(park) addPark(0,0);
+  }
+  LIMIT=(ring+0.5)*STEP+6;
 }
 
 /* ---------- monster ---------- */
@@ -372,7 +406,7 @@ function destroyHeli(h){
 }
 
 /* ---------- game state ---------- */
-const game={state:'start',time:90,score:0,hp:100,size:1,vis:1,destroyed:0,combo:1,lastKill:-9,cd:0,hop:0,squash:0,heliT:0,shake:0,zoom:0,ended:0,toasted:{}};
+const game={state:'start',level:1,builtLevel:0,time:90,score:0,hp:100,size:1,vis:1,destroyed:0,combo:1,lastKill:-9,cd:0,hop:0,squash:0,heliT:0,shake:0,zoom:0,ended:0,toasted:{}};
 const camBase=new THREE.Vector3(60,45,60), shakeV=new THREE.Vector3(), lookAt=new THREE.Vector3();
 let orbitA=0;
 
@@ -386,7 +420,7 @@ function popup(text,pos,cls){
   $('pops').appendChild(el); setTimeout(()=>el.remove(),950);
 }
 function addScore(base,pos){
-  const el=90-game.time;
+  const el=LEVEL_TIME-game.time;
   game.combo = el-game.lastKill<1.6 ? Math.min(5,game.combo+1) : 1;
   game.lastKill=el;
   const pts=base*game.combo; game.score+=pts;
@@ -438,7 +472,8 @@ function land(){
 }
 
 function resetGame(){
-  Object.assign(game,{state:'play',time:90,score:0,hp:100,size:1,vis:1,destroyed:0,combo:1,lastKill:-9,cd:0,hop:0,squash:0,heliT:4,shake:0,zoom:0,toasted:{}});
+  if(game.builtLevel!==game.level){ buildCity(game.level); game.builtLevel=game.level; }
+  Object.assign(game,{state:'play',time:LEVEL_TIME,score:0,hp:100,size:1,vis:1,destroyed:0,combo:1,lastKill:-9,cd:0,hop:0,squash:0,heliT:4,shake:0,zoom:0,toasted:{}});
   for(const b of buildings){ b.state='alive'; b.hp=b.maxHp; b.g.visible=true; b.g.position.set(b.x,0.3,b.z); b.g.rotation.set(0,0,0); b.pile.visible=false; }
   for(const h of helis) scene.remove(h.g); helis=[];
   for(const p of debris){ p.m.visible=false; p.life=0; }
@@ -447,17 +482,25 @@ function resetGame(){
   camBase.set(0,16,16);
   $('hud').style.display='flex'; $('stomp').style.display='block';
   $('startScreen').classList.add('hidden'); $('endScreen').classList.add('hidden');
+  $('lvl').textContent='Level '+game.level;
+  toast('Level '+game.level+' · '+buildings.length+' buildings');
 }
 function endGame(reason){
   if(game.state!=='play') return;
   game.state='over';
   $('stomp').style.display='none'; $('joy').style.display='none'; joy.id=null;
-  const titles={time:"Time's up!",hp:'The monster went down!',all:'The whole city is destroyed!'};
-  const pct=Math.round(game.destroyed/buildings.length*100);
+  const won=reason==='all';
+  const titles={time:"Time's up!",hp:'The monster went down!',all:'Level '+game.level+' complete!'};
+  const pct=Math.round(game.destroyed/buildings.length*100), left=buildings.length-game.destroyed;
+  game.won=won;
+  if(won) store.set('city-smash-level',Math.max(game.level+1,+(store.get('city-smash-level')||1)));
   const best=Math.max(game.score, +(store.get('city-smash-best')||0)); store.set('city-smash-best',best);
   $('endTitle').textContent=titles[reason];
   $('endScore').textContent=game.score;
-  $('endPct').textContent='City destroyed: '+pct+'%  ('+game.destroyed+' buildings)';
+  $('endPct').textContent = won
+    ? 'Every building smashed with '+Math.ceil(game.time)+'s to spare!'
+    : 'Only '+left+' building'+(left===1?'':'s')+' left! ('+pct+'% destroyed)';
+  $('againBtn').textContent = won ? 'Next Level' : 'Try Again';
   $('endBest').textContent = game.score>=best && game.score>0 ? 'New best score!' : 'Best: '+best;
   setTimeout(()=>{ $('endScreen').classList.remove('hidden'); $('againBtn').focus(); }, 900);
 }
@@ -487,8 +530,17 @@ addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
 addEventListener('contextmenu',e=>e.preventDefault());
 $('mute').addEventListener('click',()=>{ sfx.muted=!sfx.muted; $('mute').textContent=sfx.muted?'🔇':'🔊'; });
 $('startBtn').addEventListener('click',()=>{ sfx.init(); resetGame(); });
-$('againBtn').addEventListener('click',()=>{ sfx.init(); resetGame(); });
+$('againBtn').addEventListener('click',()=>{ sfx.init(); if(game.won) game.level++; resetGame(); });
+$('restartBtn').addEventListener('click',()=>{ store.set('city-smash-level',1); game.level=1; showStartLevel(); });
 const best0=store.get('city-smash-best'); if(best0){ $('bestStart').textContent='Your best: '+best0; $('bestStart').classList.remove('hidden'); }
+function showStartLevel(){
+  if(game.builtLevel!==game.level){ buildCity(game.level); game.builtLevel=game.level; }
+  $('startLevel').textContent='Level '+game.level;
+  $('startBtn').textContent=game.level>1?'Play Level '+game.level:'Start Game';
+  $('restartBtn').classList.toggle('hidden',game.level<=1);
+}
+game.level=Math.max(1,Math.floor(+(store.get('city-smash-level')||1))||1);
+showStartLevel();
 
 /* ---------- update ---------- */
 const tmp=new THREE.Vector3();
@@ -540,10 +592,10 @@ function updatePlay(dt){
   M.root.scale.set(game.vis,game.vis*sy,game.vis);
 
   // helicopters
-  const el=90-game.time;
+  const el=LEVEL_TIME-game.time, ls=levelScale(game.level);
   game.heliT-=dt;
-  const maxH=Math.min(7,2+Math.floor(el/15));
-  if(el>8 && game.heliT<=0 && helis.length<maxH){ spawnHeli(); game.heliT=Math.max(2.5,7-el*0.06); }
+  const maxH=Math.min(Math.round(7*ls),2+Math.floor(el*ls/15));
+  if(el>8 && game.heliT<=0 && helis.length<maxH){ spawnHeli(); game.heliT=Math.max(2.5,7-el*0.06)/ls; }
   const chest=tmp.set(mp.x,mp.y+2.5*game.vis,mp.z);
   const top=mp.y+5.2*game.vis;
   for(const h of helis.slice()){
@@ -555,7 +607,7 @@ function updatePlay(dt){
     h.rotor.rotation.y+=dt*25;
     h.fireT-=dt;
     if(h.fireT<=0 && Math.hypot(p.x-mp.x,p.z-mp.z)<30){
-      h.fireT=rand(2.2,3.4);
+      h.fireT=rand(2.2,3.4)/ls;
       const b=bullets.find(x=>x.life<=0);
       if(b){ b.m.position.copy(p); b.v.copy(chest).sub(p).normalize().multiplyScalar(15); b.life=4; b.m.visible=true; sfx.shot(); }
     }
