@@ -7,8 +7,9 @@ android {
         applicationId "com.talibmohd.citysmash3d"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Each CI build gets a higher version number so Android treats it as an update
+        versionCode (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger()
+        versionName "1.0." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +17,25 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // In CI the signing key comes from GitHub secrets (see .github/workflows/build-apk.yml), so every
+    // build is signed the same way and installs as an update. Without it, the default debug key is used.
+    def signingStore = System.getenv("SIGNING_STORE_FILE")
+    signingConfigs {
+        ci {
+            if (signingStore) {
+                storeFile file(signingStore)
+                storePassword System.getenv("SIGNING_STORE_PASSWORD")
+                keyAlias System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword System.getenv("SIGNING_KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
+        debug {
+            if (signingStore) signingConfig signingConfigs.ci
+        }
         release {
+            if (signingStore) signingConfig signingConfigs.ci
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
