@@ -32,8 +32,11 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Copy latest game into www
-        run: cp index.html www/index.html
+      - name: Copy latest games into www
+        run: |
+          cp index.html www/index.html
+          mkdir -p www/monster-dash
+          cp monster-dash/index.html www/monster-dash/index.html
 
       - name: Sync Capacitor
         run: npx cap sync android

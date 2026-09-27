@@ -18,6 +18,10 @@ All of these numbers are constants near the top of the `levels` section in `inde
 
 **[Play it in your browser](https://talibmohd0099.github.io/city-smash-3d/)**
 
+## Monster Dash mode
+
+The start screen also offers **Monster Dash**, an endless 3-lane runner with the same monster, city and helicopters. Swipe (or A/D, ←/→) to change lanes and SMASH! towers and helicopters. See [`monster-dash/README.md`](monster-dash/README.md).
+
 ## Controls
 
 - **Touch:** drag anywhere to move, tap **SMASH!** to slam the ground
@@ -26,6 +30,7 @@ All of these numbers are constants near the top of the `levels` section in `inde
 ## Project structure
 
 - `index.html` / `www/index.html` — the game itself (single self-contained HTML file)
+- `monster-dash/index.html` / `www/monster-dash/index.html` — the Monster Dash mode (also a single self-contained HTML file)
 - `android/` — the Capacitor-generated Android project
 - `.github/workflows/build-apk.yml` — builds a debug APK on every push to `main`
 
@@ -44,6 +49,7 @@ Either way, copy the APK to an Android phone and install it (you'll need to allo
 ```bash
 npm install
 cp index.html www/index.html
+mkdir -p www/monster-dash && cp monster-dash/index.html www/monster-dash/index.html
 npx cap sync android
 cd android
 ./gradlew assembleDebug
@@ -53,4 +59,4 @@ The APK will be at `android/app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Editing the game
 
-All game code lives in `index.html`. After making changes, copy it into `www/index.html` before syncing Capacitor (the GitHub Actions workflow does this automatically).
+All City Smash code lives in `index.html`, and all Monster Dash code lives in `monster-dash/index.html`. After making changes, copy them into `www/` (as in the build steps above) before syncing Capacitor (the GitHub Actions workflow does this automatically).
