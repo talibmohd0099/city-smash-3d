@@ -112,7 +112,7 @@ h2{margin:0 0 6px;font-size:30px;line-height:1.1;font-weight:800}
     <h1>CITY SMASH</h1>
     <div class="sub">3D Rampage</div>
     <p id="startLevel" class="sub" style="margin:0 0 8px">Level 1</p>
-    <p>You've got 90 seconds to smash every building in the city. The more buildings you flatten, the bigger your monster grows.</p>
+    <p>You've got <span id="startTime">90</span> seconds to smash every building in the city. The more buildings you flatten, the bigger your monster grows.</p>
     <p id="controlsText">Touch and drag anywhere to move. Tap SMASH! to slam the ground and shake nearby buildings apart.</p>
     <p>Watch out for helicopter gunfire.</p>
     <p id="bestStart" class="hidden"></p>
@@ -259,11 +259,16 @@ function buildingGeo(w,h,d){
 }
 
 /* ---------- levels ---------- */
-// Level 1 has ~130 buildings. Every level after that is GROWTH bigger (more buildings)
-// and harder (more, faster-firing helicopters) than the one before it.
-const GROWTH=0.025, BASE_BUILDINGS=130, LEVEL_TIME=90;
+// Level 1 has ~106 buildings. Every level after that is GROWTH bigger (more buildings)
+// and harder (more, faster-firing helicopters) than the one before it. To keep up, the
+// monster starts each level bigger and stronger, and each level gets a little more time.
+const GROWTH=0.025, BASE_BUILDINGS=106, BASE_TIME=90, TIME_PER_LEVEL=2;
+const MONSTER_GROWTH=0.01, MONSTER_GROWTH_LATE=0.004, LATE_LEVEL=10;
 const levelScale = n => Math.pow(1+GROWTH, n-1);
 const levelBuildings = n => Math.round(BASE_BUILDINGS*levelScale(n));
+const levelTime = n => BASE_TIME + TIME_PER_LEVEL*(n-1);
+const monsterScale = n => Math.pow(1+MONSTER_GROWTH, Math.min(n,LATE_LEVEL)-1)
+  * Math.pow(1+MONSTER_GROWTH_LATE, Math.max(0,n-LATE_LEVEL));
 
 /* ---------- city ---------- */
 const BLOCK=12, ROAD=5, STEP=BLOCK+ROAD, MAX_RING=8;
@@ -406,7 +411,7 @@ function destroyHeli(h){
 }
 
 /* ---------- game state ---------- */
-const game={state:'start',level:1,builtLevel:0,time:90,score:0,hp:100,size:1,vis:1,destroyed:0,combo:1,lastKill:-9,cd:0,hop:0,squash:0,heliT:0,shake:0,zoom:0,ended:0,toasted:{}};
+const game={state:'start',level:1,builtLevel:0,time:90,maxTime:90,power:1,score:0,hp:100,size:1,vis:1,destroyed:0,combo:1,lastKill:-9,cd:0,hop:0,squash:0,heliT:0,shake:0,zoom:0,ended:0,toasted:{}};
 const camBase=new THREE.Vector3(60,45,60), shakeV=new THREE.Vector3(), lookAt=new THREE.Vector3();
 let orbitA=0;
 
@@ -420,7 +425,7 @@ function popup(text,pos,cls){
   $('pops').appendChild(el); setTimeout(()=>el.remove(),950);
 }
 function addScore(base,pos){
-  const el=LEVEL_TIME-game.time;
+  const el=game.maxTime-game.time;
   game.combo = el-game.lastKill<1.6 ? Math.min(5,game.combo+1) : 1;
   game.lastKill=el;
   const pts=base*game.combo; game.score+=pts;
@@ -440,8 +445,9 @@ function collapse(b){
   for(let i=0;i<3;i++) spawnDust(b.x+rand(-.5,.5)*b.w, 1, b.z+rand(-.5,.5)*b.d, 2+b.h*0.15);
   game.destroyed++;
   addScore(b.value,new THREE.Vector3(b.x,b.h+1,b.z));
-  game.size=Math.min(2.4, 1+game.destroyed*0.03);
-  for(const th of [1.5,2,2.4]) if(game.size>=th && !game.toasted[th]){ game.toasted[th]=1; toast('The monster grew bigger!'); }
+  const growth=Math.min(2.4, 1+game.destroyed*0.03);
+  game.size=growth*game.power;
+  for(const th of [1.5,2,2.4]) if(growth>=th && !game.toasted[th]){ game.toasted[th]=1; toast('The monster grew bigger!'); }
   const sizeFactor=clamp(b.h/18,0,1);
   addShake(0.14+sizeFactor*0.32); addZoom(0.12+sizeFactor*0.38); sfx.pop(sizeFactor);
   if(game.destroyed>=buildings.length) endGame('all');
@@ -460,7 +466,7 @@ function land(){
   for(const b of buildings){
     if(b.state!=='alive') continue;
     const qx=clamp(mp.x,b.x-b.w/2,b.x+b.w/2), qz=clamp(mp.z,b.z-b.d/2,b.z+b.d/2), d=Math.hypot(mp.x-qx,mp.z-qz);
-    if(d<R) damage(b,(60+30*game.size)*(1-0.5*d/R));
+    if(d<R) damage(b,(60+30*game.size)*game.power*(1-0.5*d/R));
   }
   const top=5.2*game.vis;
   for(const h of helis.slice()){
@@ -473,7 +479,8 @@ function land(){
 
 function resetGame(){
   if(game.builtLevel!==game.level){ buildCity(game.level); game.builtLevel=game.level; }
-  Object.assign(game,{state:'play',time:LEVEL_TIME,score:0,hp:100,size:1,vis:1,destroyed:0,combo:1,lastKill:-9,cd:0,hop:0,squash:0,heliT:4,shake:0,zoom:0,toasted:{}});
+  const power=monsterScale(game.level), maxTime=levelTime(game.level);
+  Object.assign(game,{state:'play',time:maxTime,maxTime,power,score:0,hp:100,size:power,vis:power,destroyed:0,combo:1,lastKill:-9,cd:0,hop:0,squash:0,heliT:4,shake:0,zoom:0,toasted:{}});
   for(const b of buildings){ b.state='alive'; b.hp=b.maxHp; b.g.visible=true; b.g.position.set(b.x,0.3,b.z); b.g.rotation.set(0,0,0); b.pile.visible=false; }
   for(const h of helis) scene.remove(h.g); helis=[];
   for(const p of debris){ p.m.visible=false; p.life=0; }
@@ -536,6 +543,7 @@ const best0=store.get('city-smash-best'); if(best0){ $('bestStart').textContent=
 function showStartLevel(){
   if(game.builtLevel!==game.level){ buildCity(game.level); game.builtLevel=game.level; }
   $('startLevel').textContent='Level '+game.level;
+  $('startTime').textContent=levelTime(game.level);
   $('startBtn').textContent=game.level>1?'Play Level '+game.level:'Start Game';
   $('restartBtn').classList.toggle('hidden',game.level<=1);
 }
@@ -580,7 +588,7 @@ function updatePlay(dt){
       if(d>1e-4){ mp.x+=dx/d*(R-d); mp.z+=dz/d*(R-d); }
       else { const px=hx-Math.abs(mp.x-b.x)+R, pz=hz-Math.abs(mp.z-b.z)+R;
         if(px<pz) mp.x+=Math.sign(mp.x-b.x||1)*px; else mp.z+=Math.sign(mp.z-b.z||1)*pz; }
-      damage(b,(22+18*game.size)*dt);
+      damage(b,(22+18*game.size)*game.power*dt);
     }
   }
 
@@ -592,7 +600,7 @@ function updatePlay(dt){
   M.root.scale.set(game.vis,game.vis*sy,game.vis);
 
   // helicopters
-  const el=LEVEL_TIME-game.time, ls=levelScale(game.level);
+  const el=game.maxTime-game.time, ls=levelScale(game.level);
   game.heliT-=dt;
   const maxH=Math.min(Math.round(7*ls),2+Math.floor(el*ls/15));
   if(el>8 && game.heliT<=0 && helis.length<maxH){ spawnHeli(); game.heliT=Math.max(2.5,7-el*0.06)/ls; }
