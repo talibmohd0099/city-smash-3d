@@ -98,6 +98,30 @@ h2{margin:0 0 6px;font-size:30px;line-height:1.1;font-weight:800}
 .arrow{position:fixed;left:0;top:0;width:34px;height:30px;margin:-15px 0 0 -17px;pointer-events:none;
   background:var(--haldi);clip-path:polygon(100% 50%,0 0,22% 50%,0 100%);filter:drop-shadow(0 0 2px var(--ink))}
 #confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+/* intro cinematic */
+#cine{position:fixed;inset:0;pointer-events:none}
+#cine::before,#cine::after{content:'';position:fixed;left:0;right:0;height:9vh;background:#000;z-index:3}
+#cine::before{top:0} #cine::after{bottom:0}
+#cineWindow{position:fixed;inset:0;opacity:0;border:solid #5E4570;border-width:15vh 8vw 19vh;box-shadow:inset 0 0 0 12px #F3E9DC,inset 0 0 0 16px var(--ink)}
+#cineWindow::before{content:'';position:absolute;left:50%;top:0;bottom:0;width:12px;margin-left:-6px;background:#F3E9DC;border:2px solid var(--ink)}
+#cineWindow::after{content:'';position:absolute;left:0;right:0;top:42%;height:12px;background:#F3E9DC;border:2px solid var(--ink)}
+#cineWindow i{position:absolute;top:-2vh;bottom:-2vh;width:20%;background:repeating-linear-gradient(90deg,#E84A8A 0 14px,#C93A75 14px 28px);border:3px solid var(--ink)}
+#cineWindow i:first-child{left:-3vw;border-radius:0 0 60% 0} #cineWindow i:last-child{right:-3vw;border-radius:0 0 0 60%}
+#cineCockpit{position:fixed;inset:0;opacity:0}
+#cineCockpit::before,#cineCockpit::after{content:'';position:absolute;top:0;bottom:0;width:30%;background:#2A2F45}
+#cineCockpit::before{left:0;clip-path:polygon(0 0,28% 0,62% 100%,0 100%)}
+#cineCockpit::after{right:0;clip-path:polygon(72% 0,100% 0,100% 100%,38% 100%)}
+#cineCockpit .dash{position:absolute;left:-5%;right:-5%;bottom:0;height:27vh;background:#2A2F45;border-top:5px solid var(--ink);
+  border-radius:50% 50% 0 0/35% 35% 0 0;display:flex;justify-content:center;align-items:flex-start;gap:5vw;padding-top:3vh}
+#cineCockpit .dash b{width:10vh;height:10vh;border-radius:50%;background:radial-gradient(#124848,#062222);border:3px solid #9AD7E0;position:relative}
+#cineCockpit .dash b::after{content:'';position:absolute;left:50%;top:15%;width:3px;height:36%;background:#FFD84A;transform-origin:50% 100%;animation:needle 1.3s ease-in-out infinite alternate}
+#cineCockpit .dash b:nth-child(2)::after{animation-duration:.7s;background:#E5484D}
+@keyframes needle{from{transform:rotate(-50deg)}to{transform:rotate(40deg)}}
+#cineSub{position:fixed;left:50%;bottom:30vh;transform:translateX(-50%);z-index:4;width:max-content;max-width:88vw;text-align:center;
+  font-weight:800;font-size:24px;line-height:1.2;color:#fff;-webkit-text-stroke:1.2px var(--ink);text-shadow:0 3px 0 var(--ink);opacity:0;transition:opacity .25s}
+#cineSub.show{opacity:1}
+#skipBtn{position:fixed;right:14px;top:calc(9vh + 10px);z-index:4;pointer-events:auto;font:inherit;font-weight:800;font-size:16px;padding:4px 14px;
+  border-radius:12px;background:rgba(255,248,238,.92);color:var(--ink);border:3px solid var(--ink);cursor:pointer}
 .stars{font-size:46px;line-height:1;margin:2px 0 4px;letter-spacing:4px}
 .stars span{color:rgba(91,86,128,.3);display:inline-block}
 .stars span.on{color:var(--haldi);-webkit-text-stroke:2px var(--ink);animation:starIn .45s cubic-bezier(.3,1.6,.6,1) backwards}
@@ -154,6 +178,12 @@ h2{margin:0 0 6px;font-size:30px;line-height:1.1;font-weight:800}
   </div>
 </div>
 
+<div id="cine" class="hidden">
+  <div id="cineWindow"><i></i><i></i></div>
+  <div id="cineCockpit"><div class="dash"><b></b><b></b><b></b></div></div>
+  <div id="cineSub"></div>
+  <button id="skipBtn">Skip ▸▸</button>
+</div>
 <canvas id="confetti"></canvas>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -219,6 +249,8 @@ const sfx = {
   hit(){ this.tone(320,90,0.15,0.25,'square'); },
   boom(){ this.noise(0.6,1800,0.45); this.tone(90,30,0.5,0.5); },
   shot(){ this.tone(900,500,0.08,0.05,'square'); },
+  roar(){ this.bend(95,170,55,1.15,0.6); this.noise(0.9,650,0.35); },
+  rotor(v){ this.noise(0.05,320,v); },
   tick(urgent){ this.tone(urgent?1400:1000,urgent?1200:850,0.06,urgent?0.22:0.14,'square'); },
   coin(){ const n=performance.now(); if(n-(this._k||0)<70) return; this._k=n; this.tone(1320,1760,0.09,0.08,'triangle'); },
   win(){ [523,659,784,1047].forEach((f,i)=>setTimeout(()=>this.tone(f,f*1.01,i===3?0.5:0.16,0.25,'triangle'),i*130)); }
@@ -490,20 +522,58 @@ const skinMat=new THREE.MeshLambertMaterial({color:0xF5C9A0}), people=[];
 for(let i=0;i<36;i++){
   const g=new THREE.Group(), b=new THREE.Mesh(personBody,debrisMats[i%6]), h=new THREE.Mesh(personHead,skinMat);
   b.position.y=0.3; h.position.y=0.82; b.castShadow=true; g.add(b,h); g.visible=false; scene.add(g);
-  people.push({g,v:new THREE.Vector3(),life:0,ph:0});
+  people.push({g,dx:0,dz:0,speed:0,lane:0,life:0,ph:0,cell:0});
 }
 let personIdx=0;
+const projV=new THREE.Vector3();
+// Townsfolk only ever run along the roads (road centre lines sit at (k+0.5)*STEP), so they
+// never pass through buildings. They leave by the road on the side away from the monster.
+const roadLine = v => (Math.round(v/STEP-0.5)+0.5)*STEP;
 function spawnPeople(b,n){
-  const mp=M.root.position;
+  const mp=M.root.position, bx=Math.round(b.x/STEP)*STEP, bz=Math.round(b.z/STEP)*STEP;
   for(let i=0;i<n;i++){
     const p=people[personIdx]; personIdx=(personIdx+1)%people.length;
-    const x=b.x+rand(-.5,.5)*b.w, z=b.z+rand(-.5,.5)*b.d;
-    let dx=x-mp.x, dz=z-mp.z; const l=Math.hypot(dx,dz)||1; dx/=l; dz/=l;
-    const a=rand(-0.6,0.6), c=Math.cos(a), sn=Math.sin(a);
-    p.v.set((dx*c-dz*sn)*rand(4,6),0,(dx*sn+dz*c)*rand(4,6));
-    p.g.position.set(x+dx*(b.w/2+0.4),0.3,z+dz*(b.d/2+0.4)); p.g.rotation.y=Math.atan2(p.v.x,p.v.z);
-    p.g.scale.setScalar(1); p.g.visible=true; p.life=rand(2,2.8); p.ph=rand(0,6);
+    const ax=b.x-mp.x, az=b.z-mp.z, lane=rand(-1.2,1.2);
+    let x, z, dx=0, dz=0;
+    if(Math.abs(ax)>=Math.abs(az)){ // exit onto the road beside the block on the far side from the monster
+      x=bx+Math.sign(ax||1)*STEP/2+lane; z=b.z+rand(-.4,.4)*b.d; dz=Math.sign(az||rand(-1,1)); if(Math.abs(az)<2) dz=Math.random()<.5?-1:1;
+    } else {
+      z=bz+Math.sign(az||1)*STEP/2+lane; x=b.x+rand(-.4,.4)*b.w; dx=Math.sign(ax||rand(-1,1)); if(Math.abs(ax)<2) dx=Math.random()<.5?-1:1;
+    }
+    p.g.position.set(x,0.3,z); p.dx=dx; p.dz=dz; p.lane=lane; p.speed=rand(5,6.5);
+    p.cell=dx ? Math.floor(x/STEP-0.5) : Math.floor(z/STEP-0.5);
+    p.g.rotation.y=Math.atan2(dx,dz); p.g.visible=true; p.life=14; p.ph=rand(0,6);
   }
+}
+function updatePerson(p,dt){
+  const mp=M.root.position, pos=p.g.position;
+  const away=Math.hypot(pos.x-mp.x,pos.z-mp.z), panic=away<10*game.vis?1.6:1;
+  pos.x+=p.dx*p.speed*panic*dt; pos.z+=p.dz*p.speed*panic*dt;
+  // at each crossing, keep going or turn onto the cross street, whichever heads away from the monster
+  const along=p.dx?pos.x:pos.z, cell=Math.floor(along/STEP-0.5);
+  if(cell!==p.cell){
+    p.cell=cell;
+    const cx=p.dx?(cell+(p.dx>0?0:1)+0.5)*STEP:roadLine(pos.x), cz=p.dz?(cell+(p.dz>0?0:1)+0.5)*STEP:roadLine(pos.z);
+    const ax=cx-mp.x, az=cz-mp.z;
+    const opts=[[p.dx,p.dz],[p.dz,-p.dx],[-p.dz,p.dx]];
+    let best=opts[0], bs=-1e9;
+    for(const o of opts){ const sc=o[0]*ax+o[1]*az+rand(0,4); if(sc>bs){ bs=sc; best=o; } }
+    if(best!==opts[0]){ pos.x=cx+(best[0]?0:p.lane); pos.z=cz+(best[1]?0:p.lane); p.dx=best[0]; p.dz=best[1]; p.cell=Math.floor((p.dx?pos.x:pos.z)/STEP-0.5-((p.dx||p.dz)<0?1e-3:0)); }
+    p.g.rotation.y=Math.atan2(p.dx,p.dz);
+  }
+  // never end up under the monster's feet: get nudged out to its side
+  const R=1.4*game.vis+0.4, ox=pos.x-mp.x, oz=pos.z-mp.z, d=Math.hypot(ox,oz);
+  if(d<R){ const k=(R-d)/(d||1); pos.x+=ox*k; pos.z+=oz*k; }
+  // ...but always stay on the road they're running along
+  if(p.dx) pos.z=clamp(pos.z,roadLine(pos.z)-2.2,roadLine(pos.z)+2.2); else pos.x=clamp(pos.x,roadLine(pos.x)-2.2,roadLine(pos.x)+2.2);
+  { const qx=pos.x-mp.x, qz=pos.z-mp.z, q=Math.hypot(qx,qz);
+    if(q<R){ const sgn=Math.sign(qx*p.dx+qz*p.dz)||1, need=Math.sqrt(Math.max(0,R*R-(p.dx?qz*qz:qx*qx)))+0.1;
+      if(p.dx) pos.x=mp.x+sgn*need; else pos.z=mp.z+sgn*need; } } // still cornered: dodge ahead along the road
+  pos.y=0.3+Math.abs(Math.sin(p.ph))*0.28;
+  // gone once they've run off screen (or after a long while)
+  p.life-=dt;
+  projV.set(pos.x,pos.y,pos.z).project(camera);
+  if(p.life<=0 || projV.z>1 || Math.abs(projV.x)>1.2 || Math.abs(projV.y)>1.2){ p.life=0; p.g.visible=false; }
 }
 // bouncing arrows over the last few buildings
 const markerGeo=new THREE.ConeGeometry(0.9,1.6,4), markerMat=new THREE.MeshBasicMaterial({color:0xFFD84A}), markers=[];
@@ -514,7 +584,7 @@ for(let i=0;i<15;i++){ const a=document.createElement('div'); a.className='arrow
 /* ---------- helicopters ---------- */
 const heliBody=new THREE.MeshLambertMaterial({color:0x34405A}), heliGlass=new THREE.MeshLambertMaterial({color:0x9AD7E0}), heliRed=new THREE.MeshBasicMaterial({color:0xE5484D});
 let helis=[];
-function spawnHeli(){
+function makeHeli(){
   const g=new THREE.Group();
   const add=(geo,mat,x,y,z)=>{ const m=new THREE.Mesh(geo,mat); m.position.set(x,y,z); m.castShadow=true; g.add(m); return m; };
   add(new THREE.BoxGeometry(1.3,1,2.2),heliBody,0,0,0);
@@ -523,10 +593,23 @@ function spawnHeli(){
   add(new THREE.BoxGeometry(0.2,0.2,0.2),heliRed,0,0.35,-3);
   const rotor=new THREE.Group(); rotor.position.y=0.65; g.add(rotor);
   rotor.add(new THREE.Mesh(new THREE.BoxGeometry(4.4,0.06,0.25),heliBody), new THREE.Mesh(new THREE.BoxGeometry(0.25,0.06,4.4),heliBody));
-  const a=rand(0,Math.PI*2), mp=M.root.position;
-  g.position.set(mp.x+Math.cos(a)*48, 14, mp.z+Math.sin(a)*48);
   scene.add(g);
-  helis.push({g,rotor,orbit:a,fireT:rand(2,3.5)});
+  return {g,rotor};
+}
+// lowest safe flying height over (x,z): above every standing building within reach of the rotor
+function skyClearance(x,z){
+  let top=0;
+  for(const b of buildings){
+    if(b.state!=='alive') continue;
+    if(Math.abs(x-b.x)<b.w/2+2.6 && Math.abs(z-b.z)<b.d/2+2.6) top=Math.max(top,b.h+0.3);
+  }
+  return top ? top+1.9 : 0;
+}
+function spawnHeli(){
+  const h=makeHeli(), a=rand(0,Math.PI*2), mp=M.root.position;
+  const x=mp.x+Math.cos(a)*48, z=mp.z+Math.sin(a)*48;
+  h.g.position.set(x, Math.max(14,skyClearance(x,z)), z);
+  helis.push(Object.assign(h,{orbit:a,fireT:rand(2,3.5)}));
 }
 function destroyHeli(h){
   const p=h.g.position;
@@ -655,6 +738,8 @@ function endGame(reason){
   const titles={time:"Time's up!",hp:'The monster went down!',all:'Level '+game.level+' complete!'};
   const pct=Math.round(game.destroyed/buildings.length*100), left=buildings.length-game.destroyed;
   game.won=won;
+  // decide right now which level the end-screen button leads to: the next one only on a real win
+  game.nextLevel = won ? game.level+1 : game.level;
   if(won) store.set('city-smash-level',Math.max(game.level+1,+(store.get('city-smash-level')||1)));
   const best=Math.max(game.score, +(store.get('city-smash-best')||0)); store.set('city-smash-best',best);
   $('endTitle').textContent=titles[reason];
@@ -706,7 +791,6 @@ function updateCelebrate(dt){
 
 /* ---------- last-buildings helpers ---------- */
 function hideMarkers(){ for(const m of markers) m.visible=false; for(const a of arrowEls) a.classList.add('hidden'); }
-const projV=new THREE.Vector3();
 function updateMarkers(left,now){
   const show = left<=8 || (game.time<=15 && left<=15);
   let i=0;
@@ -751,8 +835,12 @@ addEventListener('keydown',e=>{ keys.add(e.key.toLowerCase()); if(e.code==='Spac
 addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
 addEventListener('contextmenu',e=>e.preventDefault());
 $('mute').addEventListener('click',()=>{ sfx.muted=!sfx.muted; $('mute').textContent=sfx.muted?'🔇':'🔊'; });
-$('startBtn').addEventListener('click',()=>{ sfx.init(); resetGame(); });
-$('againBtn').addEventListener('click',()=>{ sfx.init(); if(game.won) game.level++; resetGame(); });
+$('startBtn').addEventListener('click',()=>{ sfx.init(); if(!introSeen) startIntro(); else resetGame(); });
+$('againBtn').addEventListener('click',()=>{
+  // ignore taps unless the end screen is really showing (e.g. a double tap on "Try Again")
+  if(game.state!=='over' || $('endScreen').classList.contains('hidden')) return;
+  sfx.init(); game.level=game.nextLevel; resetGame();
+});
 $('restartBtn').addEventListener('click',()=>{ store.set('city-smash-level',1); game.level=1; showStartLevel(); });
 const best0=store.get('city-smash-best'); if(best0){ $('bestStart').textContent='Your best: '+best0; $('bestStart').classList.remove('hidden'); }
 function showStartLevel(){
@@ -823,9 +911,14 @@ function updatePlay(dt){
   const top=mp.y+5.2*game.vis;
   for(const h of helis.slice()){
     h.orbit+=dt*0.35;
-    const tx=mp.x+Math.cos(h.orbit)*14, tz=mp.z+Math.sin(h.orbit)*14, ty=4.5+game.size*1.8;
-    const p=h.g.position, dx=tx-p.x, dy=ty-p.y, dz=tz-p.z, dl=Math.hypot(dx,dy,dz), step=Math.min(dl,9*dt);
+    const tx=mp.x+Math.cos(h.orbit)*14, tz=mp.z+Math.sin(h.orbit)*14, p=h.g.position;
+    // climb early for buildings just ahead, so helicopters fly over them instead of through them
+    const hx=tx-p.x, hz=tz-p.z, hl=Math.hypot(hx,hz)||1, ahead=Math.min(hl,5);
+    const safe=Math.max(skyClearance(p.x,p.z), skyClearance(p.x+hx/hl*ahead,p.z+hz/hl*ahead));
+    const ty=Math.max(4.5+game.size*1.8, safe);
+    const dx=tx-p.x, dy=ty-p.y, dz=tz-p.z, dl=Math.hypot(dx,dy,dz), step=Math.min(dl,9*dt);
     if(dl>0.01){ p.x+=dx/dl*step; p.y+=dy/dl*step; p.z+=dz/dl*step; }
+    p.y=Math.max(p.y, safe-1.2);
     h.g.lookAt(mp.x,p.y,mp.z); h.g.rotateX(0.15);
     h.rotor.rotation.y+=dt*25;
     h.fireT-=dt;
@@ -840,8 +933,14 @@ function updatePlay(dt){
   for(const b of bullets){
     if(b.life<=0) continue;
     b.life-=dt; b.m.position.addScaledVector(b.v,dt);
-    if(b.m.position.distanceTo(chest)<hitR){ b.life=0; b.m.visible=false; hurt(6); popup('-6',b.m.position.clone(),'bad'); }
-    else if(b.life<=0||b.m.position.y<0){ b.life=0; b.m.visible=false; }
+    const bp=b.m.position;
+    if(bp.distanceTo(chest)<hitR){ b.life=0; b.m.visible=false; hurt(6); popup('-6',bp.clone(),'bad'); }
+    else if(b.life<=0||bp.y<0){ b.life=0; b.m.visible=false; }
+    else for(const o of buildings){ // buildings block shots
+      if(o.state==='alive' && bp.y<o.h+0.3 && Math.abs(bp.x-o.x)<o.w/2 && Math.abs(bp.z-o.z)<o.d/2){
+        b.life=0; b.m.visible=false; spawnDebris(bp.x,bp.y,bp.z,o.ci,0.25,2); break;
+      }
+    }
   }
 
   // camera
@@ -900,10 +999,7 @@ function updateWorld(dt){
   }
   for(const p of people){
     if(p.life<=0) continue;
-    p.life-=dt; p.ph+=dt*16;
-    p.g.position.addScaledVector(p.v,dt); p.g.position.y=0.3+Math.abs(Math.sin(p.ph))*0.28;
-    if(p.life<0.4) p.g.scale.setScalar(Math.max(0.01,p.life/0.4));
-    if(p.life<=0) p.g.visible=false;
+    p.ph+=dt*16; updatePerson(p,dt);
   }
   if(snow.visible){
     const a=snowGeo.attributes.position, arr=a.array;
@@ -933,6 +1029,128 @@ function updateWorld(dt){
   sun.position.set(mp.x+sunOffset.x,sunOffset.y,mp.z+sunOffset.z); sun.target.position.set(mp.x,0,mp.z);
 }
 
+/* ---------- intro cinematic: one continuous camera move, no cuts ----------
+   0-4.5s   inside a building, looking out the window as the monster stomps up and roars
+   4.5-8s   the camera flies out the window, up past the monster, round behind an arriving helicopter
+   8-11s    into the cockpit: the pilot's view of the monster
+   11-13s   out of the helicopter and down into the normal game camera */
+const INTRO_LEN=13;
+const intro={t:0,heli:null};
+let introSeen=false;
+const sm=(a,b,t)=>{ const x=clamp((t-a)/(b-a),0,1); return x*x*(3-2*x); };
+const SUBS=[[0.4,3.1,'Uh-oh… is that a MONSTER?!'],[3.5,4.6,'ROOOAAARRR!'],[8.2,9.4,'Pilot: Base, I see it… it’s HUGE!'],
+  [9.5,10.8,'ROOOAAARRR!'],[11.2,13,'Smash every building. GO!']];
+function introHeliAt(t,out){
+  // flies in along the road in front of the building, hovers, then climbs away
+  const P=intro.hp;
+  if(t<8) out.lerpVectors(P[0],P[1],sm(4.5,8,t)*0.35+sm(4.5,8,t)*0.65*sm(4.5,8,t));
+  else if(t<11) out.lerpVectors(P[1],P[2],sm(8,11,t));
+  else out.lerpVectors(P[2],P[3],sm(11,13.5,t));
+  out.y=Math.max(out.y,skyClearance(out.x,out.z));
+  return out;
+}
+function cockpitAt(t,out){
+  introHeliAt(t,out);
+  const dx=-out.x, dz=-out.z, l=Math.hypot(dx,dz)||1;
+  return out.set(out.x+dx/l*1.75, out.y+0.28, out.z+dz/l*1.75);
+}
+function startIntro(){
+  introSeen=true;
+  const power=monsterScale(game.level); game.vis=game.size=power; game.shake=game.zoom=0;
+  for(const b of buildings){ b.state='alive'; b.hp=b.maxHp; b.g.visible=true; b.g.position.set(b.x,0.3,b.z); b.g.rotation.set(0,0,0); b.pile.visible=false; b.evac=0; b.smokeT=0; }
+  // watch from the building nearest the park, on the side facing it
+  let B=buildings[0], bd=1e9;
+  for(const b of buildings){ const d=Math.hypot(b.x,b.z-14); if(d<bd){ bd=d; B=b; } }
+  const facing=Math.abs(B.z)>=Math.abs(B.x) ? new THREE.Vector3(0,0,-Math.sign(B.z)) : new THREE.Vector3(-Math.sign(B.x),0,0);
+  const wy=Math.min(3.2,B.h-0.6);
+  intro.win=new THREE.Vector3(B.x+facing.x*(B.w/2-0.35), wy, B.z+facing.z*(B.d/2-0.35));
+  if(facing.z) intro.win.x=clamp(0,B.x-B.w/2+0.6,B.x+B.w/2-0.6); else intro.win.z=clamp(0,B.z-B.d/2+0.6,B.z+B.d/2-0.6);
+  intro.facing=facing;
+  // helicopter route: along the road between the park and that building
+  const side=new THREE.Vector3(-facing.z,0,facing.x), road=intro.win.clone().addScaledVector(facing,Math.abs(intro.win.x*facing.x+intro.win.z*facing.z)-8.5);
+  road.y=0;
+  const at=(along,h)=>road.clone().addScaledVector(side,along).setY(h);
+  intro.hp=[at(70,17),at(18,10),at(11,9).addScaledVector(facing,1.3),at(34,24).addScaledVector(facing,-12)];
+  intro.heli=makeHeli(); introHeliAt(4.5,intro.heli.g.position);
+  const c8=cockpitAt(8,new THREE.Vector3());
+  const lift=(v,m)=>{ v.y=Math.max(v.y,skyClearance(v.x,v.z)+m); return v; };
+  intro.path=new THREE.CatmullRomCurve3([
+    intro.win.clone(),
+    intro.win.clone().addScaledVector(facing,3.5).setY(wy+1.2),
+    lift(side.clone().multiplyScalar(5).setY(7.5).addScaledVector(facing,-2),1),
+    lift(at(25,11.5).addScaledVector(facing,0.8),1),
+    c8]);
+  let k=0.85+power*0.4; if(innerWidth<innerHeight) k*=1.25;
+  intro.game=new THREE.Vector3(0,12*k+2,12*k);
+  intro.gameLook=new THREE.Vector3(0,2.2*power,-1);
+  M.root.position.copy(facing).multiplyScalar(7); M.root.rotation.y=Math.atan2(-facing.x,-facing.z); M.root.scale.setScalar(power);
+  intro.t=0; intro.rotorT=0; intro.sub=-1; intro.roared=0;
+  game.state='intro';
+  $('startScreen').classList.add('hidden'); $('cine').classList.remove('hidden');
+}
+const iv=new THREE.Vector3(), iv2=new THREE.Vector3(), headV=new THREE.Vector3();
+function updateIntro(dt){
+  const t=(intro.t+=dt), v=game.vis, mp=M.root.position;
+  if(t>=INTRO_LEN){ finishIntro(); return; }
+  // --- monster: stomp up to the park centre, roar, turn to the helicopter, roar again, face forward
+  const walk=sm(0.4,3.4,t);
+  mp.set(0,0,0).addScaledVector(intro.facing,7*(1-walk));
+  const moving=t>0.4&&t<3.4, ph=t*9;
+  M.legL.rotation.x=moving?Math.sin(ph)*0.65:0; M.legR.rotation.x=-M.legL.rotation.x;
+  M.body.position.y=moving?Math.abs(Math.sin(ph))*0.12:0;
+  if(moving && Math.sin(ph)*Math.sin(ph-dt*9)<0) addShake(0.12);
+  const heliP=introHeliAt(t,intro.heli.g.position);
+  const heliYaw=Math.atan2(heliP.x-mp.x,heliP.z-mp.z);
+  const baseYaw=Math.atan2(-intro.facing.x,-intro.facing.z);
+  const turn=sm(6.2,7.6,t)*(1-sm(10.8,12.6,t));
+  M.root.rotation.y=angleLerp(angleLerp(baseYaw,heliYaw,turn),0,sm(10.8,12.6,t));
+  const roar=Math.max(sm(3.4,3.7,t)*(1-sm(4.4,4.8,t)), sm(9.4,9.7,t)*(1-sm(10.5,10.9,t)));
+  M.armL.rotation.x=M.armR.rotation.x=(moving?-Math.sin(ph)*0.5:0)-2.4*roar+Math.sin(t*30)*0.15*roar;
+  M.armL.rotation.z=-0.5*roar; M.armR.rotation.z=0.5*roar;
+  M.body.rotation.x=-0.25*roar;
+  if(t>3.45 && intro.roared<1){ intro.roared=1; sfx.roar(); addShake(0.6); }
+  if(t>9.45 && intro.roared<2){ intro.roared=2; sfx.roar(); addShake(0.45); }
+  headV.set(mp.x,4.2*v,mp.z);
+  // --- helicopter
+  intro.heli.g.lookAt(t<11?mp.x:heliP.x+(heliP.x-mp.x),heliP.y,t<11?mp.z:heliP.z+(heliP.z-mp.z)); intro.heli.g.rotateX(0.15);
+  if(t>9.4&&t<10.8) intro.heli.g.rotateZ(Math.sin(t*14)*0.12);
+  intro.heli.rotor.rotation.y+=dt*25;
+  intro.rotorT-=dt;
+  if(t>4.8 && intro.rotorT<=0){ intro.rotorT=0.085; sfx.rotor(clamp(1-camera.position.distanceTo(heliP)/60,0.03,1)*0.22); }
+  // --- camera: one continuous move
+  if(t<4.5){
+    camBase.copy(intro.win); camBase.y+=Math.sin(t*1.7)*0.04;
+    lookAt.copy(headV);
+  } else if(t<8){
+    intro.path.getPoint(sm(4.5,8,t)*0.5+(t-4.5)/3.5*0.5, camBase);
+    iv.copy(headV).lerp(heliP,sm(5.4,6.6,t)*(1-sm(7,7.9,t)));
+    lookAt.copy(iv);
+  } else if(t<11){
+    cockpitAt(t,camBase); camBase.y+=Math.sin(t*23)*0.02;
+    lookAt.copy(headV);
+  } else {
+    const u=sm(11,13,t);
+    cockpitAt(11,iv); iv2.copy(iv).lerp(intro.game,0.5).setY(Math.max(iv.y,intro.game.y)+4);
+    // quadratic arc from the cockpit up and over into the game camera
+    camBase.copy(iv).multiplyScalar((1-u)*(1-u)).addScaledVector(iv2,2*u*(1-u)).addScaledVector(intro.game,u*u);
+    lookAt.copy(headV).lerp(intro.gameLook,u);
+  }
+  // --- overlays + subtitles
+  $('cineWindow').style.opacity=1-sm(4.35,4.85,t);
+  $('cineCockpit').style.opacity=sm(7.75,8.15,t)*(1-sm(10.85,11.25,t));
+  let si=-1; SUBS.forEach((sb,i)=>{ if(t>=sb[0]&&t<sb[1]) si=i; });
+  if(si!==intro.sub){ intro.sub=si; const el=$('cineSub'); el.classList.toggle('show',si>=0); if(si>=0) el.textContent=SUBS[si][2]; }
+}
+function finishIntro(){
+  if(game.state!=='intro') return;
+  scene.remove(intro.heli.g); intro.heli=null;
+  $('cine').classList.add('hidden'); $('cineSub').classList.remove('show');
+  M.body.rotation.x=0; M.armL.rotation.z=M.armR.rotation.z=0; M.body.position.y=0;
+  resetGame();
+  camBase.copy(intro.game); lookAt.copy(intro.gameLook);
+}
+$('skipBtn').addEventListener('click',finishIntro);
+
 function updateIdle(dt){
   orbitA+=dt*0.08;
   camBase.set(Math.sin(orbitA)*70,42,Math.cos(orbitA)*70);
@@ -945,6 +1163,7 @@ function loop(now){
   const dt=Math.min(0.05,(now-last)/1000); last=now;
   if(game.state==='play') updatePlay(dt);
   else if(game.state==='start') updateIdle(dt);
+  else if(game.state==='intro') updateIntro(dt);
   else if(game.won) updateCelebrate(dt);
   updateWorld(dt);
   confetti.update(dt);
