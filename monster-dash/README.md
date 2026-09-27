@@ -2,7 +2,7 @@
 
 A second game built from City Smash 3D's assets: an endless 3-lane runner. The monster charges down Main Street, smashing through small buildings, dodging or slamming tall towers, grabbing coins and swatting helicopters.
 
-It is a separate, self-contained page (`monster-dash/index.html`). City Smash 3D itself (`index.html`, `www/`, `android/`) is untouched.
+It is a separate, self-contained page (`monster-dash/index.html`), offered as a second game mode: City Smash 3D's start and end screens link to it, and it links back. The APK workflow copies it to `www/monster-dash/index.html`, so both modes ship in the same app.
 
 ## How to play
 
@@ -24,4 +24,4 @@ The monster and helicopter models, building window textures, rooftop tanks and s
 
 ## Running it
 
-Open `monster-dash/index.html` in a browser (it needs internet for Three.js and the font). If GitHub Pages serves this repo, it will be at `/city-smash-3d/monster-dash/` once merged.
+Open `monster-dash/index.html` in a browser (it needs internet for Three.js and the font), or tap **Play Monster Dash** on City Smash 3D's start screen. If GitHub Pages serves this repo, it will be at `/city-smash-3d/monster-dash/` once merged.

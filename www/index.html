@@ -70,6 +70,9 @@ h2{margin:0 0 6px;font-size:30px;line-height:1.1;font-weight:800}
 .btn:focus-visible,#mute:focus-visible,#stomp:focus-visible{outline:3px dashed var(--teal);outline-offset:4px}
 .hidden{display:none!important}
 .link{margin-top:12px;font:inherit;font-weight:700;font-size:15px;background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer}
+a.btn{display:inline-block;text-decoration:none}
+.btn.alt{background:var(--lime)}
+.mode{margin:14px 0 0;font-size:14px!important;color:var(--muted)}
 
 .pop{position:fixed;left:0;top:0;font-weight:800;font-size:22px;color:#FFF3C4;white-space:nowrap;
   -webkit-text-stroke:1.5px var(--ink);text-shadow:0 3px 0 var(--ink);pointer-events:none;animation:rise .9s ease-out forwards}
@@ -163,6 +166,8 @@ h2{margin:0 0 6px;font-size:30px;line-height:1.1;font-weight:800}
     <p id="bestStart" class="hidden"></p>
     <button class="btn" id="startBtn">Start Game</button>
     <p><button class="link hidden" id="restartBtn">Start over from Level 1</button></p>
+    <p class="mode">Or try the endless runner mode:</p>
+    <a class="btn alt" id="dashBtn" href="monster-dash/index.html">Play Monster Dash</a>
   </div>
 </div>
 
@@ -175,6 +180,7 @@ h2{margin:0 0 6px;font-size:30px;line-height:1.1;font-weight:800}
     <p id="endPct"></p>
     <p id="endBest"></p>
     <button class="btn" id="againBtn">Play Again</button>
+    <p><a class="link" href="monster-dash/index.html">Switch to Monster Dash</a></p>
   </div>
 </div>
 
