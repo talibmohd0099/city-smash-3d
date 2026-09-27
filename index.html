@@ -74,7 +74,7 @@ h2{margin:0 0 6px;font-size:30px;line-height:1.1;font-weight:800}
 #pauseScreen,#settingsScreen{z-index:10}
 #settingsScreen{background:rgba(29,27,58,.72)}
 .menu{display:flex;flex-direction:column;align-items:center;gap:4px}
-.btn.alt{background:var(--paper);font-size:18px;padding:8px 18px;min-width:190px}
+.btn.plain{background:var(--paper);font-size:18px;padding:8px 18px;min-width:190px}
 .btn.big{min-width:190px}
 .set{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0;font-weight:700;font-size:17px;text-align:left}
 .set input[type=range]{flex:1;min-width:0;accent-color:var(--pink);height:28px}
@@ -86,6 +86,9 @@ h2{margin:0 0 6px;font-size:30px;line-height:1.1;font-weight:800}
 .btn.danger.confirm{background:var(--danger);color:#fff}
 .note{font-size:14px!important;color:var(--muted);min-height:1.4em;margin:4px 0 0!important}
 .link{margin-top:12px;font:inherit;font-weight:700;font-size:15px;background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer}
+a.btn{display:inline-block;text-decoration:none}
+.btn.alt{background:var(--lime)}
+.mode{margin:14px 0 0;font-size:14px!important;color:var(--muted)}
 
 .pop{position:fixed;left:0;top:0;font-weight:800;font-size:22px;color:#FFF3C4;white-space:nowrap;
   -webkit-text-stroke:1.5px var(--ink);text-shadow:0 3px 0 var(--ink);pointer-events:none;animation:rise .9s ease-out forwards}
@@ -182,6 +185,8 @@ h2{margin:0 0 6px;font-size:30px;line-height:1.1;font-weight:800}
     <p id="bestStart" class="hidden"></p>
     <button class="btn" id="startBtn">Start Game</button>
     <p><button class="link" id="settingsBtn">⚙ Settings</button> <button class="link hidden" id="restartBtn">Start over from Level 1</button></p>
+    <p class="mode">Or try the endless runner mode:</p>
+    <a class="btn alt" id="dashBtn" href="monster-dash/index.html">Play Monster Dash</a>
   </div>
 </div>
 
@@ -194,6 +199,7 @@ h2{margin:0 0 6px;font-size:30px;line-height:1.1;font-weight:800}
     <p id="endPct"></p>
     <p id="endBest"></p>
     <button class="btn" id="againBtn">Play Again</button>
+    <p><a class="link" href="monster-dash/index.html">Switch to Monster Dash</a></p>
   </div>
 </div>
 
@@ -202,9 +208,9 @@ h2{margin:0 0 6px;font-size:30px;line-height:1.1;font-weight:800}
     <h2>Paused</h2>
     <div class="menu">
       <button class="btn big" id="resumeBtn">Resume</button>
-      <button class="btn alt" id="retryBtn">Restart Level</button>
-      <button class="btn alt" id="pauseSettingsBtn">Settings</button>
-      <button class="btn alt" id="quitBtn">Main Menu</button>
+      <button class="btn plain" id="retryBtn">Restart Level</button>
+      <button class="btn plain" id="pauseSettingsBtn">Settings</button>
+      <button class="btn plain" id="quitBtn">Main Menu</button>
     </div>
   </div>
 </div>
