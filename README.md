@@ -2,6 +2,10 @@
 
 A fast, casual 3D monster-rampage game built with [Three.js](https://threejs.org/). Grow bigger by smashing buildings, dodge helicopter gunfire, and smash every building in the city before the timer runs out to reach the next level.
 
+## Intro
+
+Pressing **Start** plays a short skippable intro (once per launch) as one continuous camera move: a person's view from a building window as the monster arrives, then out to a helicopter and the pilot's cockpit view, then down into the game.
+
 ## Levels
 
 - Level 1: 106 buildings, 90 seconds. Clear the whole city to unlock the next level (progress is saved).
