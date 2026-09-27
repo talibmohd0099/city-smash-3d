@@ -1,6 +1,16 @@
 # City Smash 3D
 
-A fast, casual 3D monster-rampage game built with [Three.js](https://threejs.org/). Grow bigger by smashing buildings, dodge helicopter gunfire, and beat your best score before the 90-second timer runs out.
+A fast, casual 3D monster-rampage game built with [Three.js](https://threejs.org/). Grow bigger by smashing buildings, dodge helicopter gunfire, and smash every building in the city before the timer runs out to reach the next level.
+
+## Levels
+
+- Level 1: 106 buildings, 90 seconds. Clear the whole city to unlock the next level (progress is saved).
+- Each level has 2.5% more buildings and 2.5% more helicopter pressure, plus 2 extra seconds.
+- The monster starts each level 1% bigger and stronger (0.4% per level after level 10).
+- The city's look changes every 5 levels: Sunset City, Sunny Day, Night Lights, Snow Day (then repeats).
+- Win with 8+ seconds left for 2 stars, 15+ seconds left for 3 stars.
+
+All of these numbers are constants near the top of the `levels` section in `index.html`.
 
 **[Play it in your browser](https://talibmohd0099.github.io/city-smash-3d/)**
 
