@@ -30,6 +30,17 @@ It is a separate, self-contained page (`rooftop-rush/index.html`). Nothing else 
 - The level builder simulates each jump to work out how far it can carry for the height difference. It then sizes every gap to fit inside that reach with a margin, so no gap is impossible.
 - The police replay the runner's own path from a moment earlier, so they make the same jumps. Stumbles shorten that delay.
 
+## 3D models
+
+The scenery buildings beside the route and the helicopter use 3D models loaded from `models/` next to the page:
+
+- `models/buildings.glb`: models 001–006 from the *Residential Buildings Set* (Unity package), 18–47 m tall, shown at 0.65 scale. The four tallest (68–105 m) are left out because they were most of the file size and made phones render far more triangles. Buildings further than 35 m away swap to a plain box of the same size (level of detail), which saves most of the rendering cost.
+- `models/seahawk.glb`: the *SeaHawk* helicopter, with the cabin interior removed and simplified to about 30% of its triangles (0.7 MB instead of 12 MB). The main and tail rotors spin.
+- **Conversion:** FBX/OBJ were converted to GLB in the browser with three.js, the building's ambient-occlusion atlas was baked into its wall texture, and the files were welded and quantized with gltf-transform.
+- **Fallback:** if `models/` is missing or can't load (for example offline, or when the page is opened as a local file), the game keeps its box-built buildings and helicopter.
+
+The models come from third-party packs whose licences aren't included. Check that their terms allow commercial use and redistribution before publishing them, since this repository is public.
+
 ## What's reused from City Smash 3D
 
 Building window textures, rooftop tanks, snow caps, the four themes, street lamps, the helicopter, the synth sound effects, the confetti and the whole UI style. They are copied into this file, because the original game is one closed script with nothing to import. The runner, the police officer, cars, rooftop obstacles, planks and the goal building are new and built from boxes in code.

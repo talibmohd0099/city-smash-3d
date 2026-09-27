@@ -154,6 +154,7 @@ h2{margin:0 0 6px;font-size:30px;line-height:1.1;font-weight:800}
 <canvas id="confetti"></canvas>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 (function(){
 const $ = id => document.getElementById(id);
@@ -239,7 +240,7 @@ document.body.prepend(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xF2A58C, 45, 140);
-const camera = new THREE.PerspectiveCamera(58, innerWidth/innerHeight, 0.1, 170);
+const camera = new THREE.PerspectiveCamera(58, innerWidth/innerHeight, 0.1, 150);
 // phones in portrait get a wider view so all three lanes stay on screen
 function fitView(){ camera.aspect=innerWidth/innerHeight; camera.fov=innerWidth<innerHeight?72:58; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); }
 fitView();
@@ -307,7 +308,7 @@ const THEMES=[
 const themeFor = n => THEMES[(n-1)%THEMES.length];
 let theme=THEMES[0], roadTex=null;
 const blocks=[]; // scenery buildings, repainted on a theme change
-function retint(b){ b.m.material=(theme.night?buildMatsNight:buildMats)[b.ci]; b.cap.visible=!!theme.snow; }
+function retint(b){ if(b.model) return; b.m.material=(theme.night?buildMatsNight:buildMats)[b.ci]; b.cap.visible=!!theme.snow; }
 
 /* ---------- the street next to the rooftops ---------- */
 const LANE=3.6, ROOF_HALF=6.2, laneX=l=>(l-1)*LANE;
@@ -347,6 +348,7 @@ function applyTheme(t){
   roadMat.map=roadTex; roadMat.needsUpdate=true;
   snow.visible=!!t.snow;
   for(const b of blocks) retint(b);
+  if(bldGlass) bldGlass.emissive.setHex(t.night?0x7A6030:0x000000); // lit windows at night
 }
 
 /* ---------- scenery: buildings either side and street lamps, recycled ahead of the runner ---------- */
@@ -420,6 +422,58 @@ const beamGeo=new THREE.CylinderGeometry(0.3,3,1,24,1,true); beamGeo.rotateX(-Ma
 const beam=new THREE.Mesh(beamGeo,beamMat); scene.add(beam);
 const spotMat=new THREE.MeshBasicMaterial({color:0xFFF3C4,transparent:true,opacity:0.12,depthWrite:false,blending:THREE.AdditiveBlending});
 const spot=new THREE.Mesh(new THREE.CircleGeometry(3,28),spotMat); spot.rotation.x=-Math.PI/2; scene.add(spot);
+
+/* ---------- 3D models: residential buildings for the scenery and the SeaHawk helicopter ---------- */
+// Loaded from models/ next to this page. If they can't load (offline, or opened as a local file),
+// the box-built buildings and helicopter above stay in place.
+const BLD_SCALE=0.65, HELI_SCALE=0.42, BLD_LOD=35; // BLD_LOD: beyond this many metres a plain box stands in for the detailed model
+let bldGlass=null, bldKinds=[];
+const bldFarMat=new THREE.MeshLambertMaterial({color:0xB9A98C});
+function lambertize(root,shadow){ // same lighting model as the rest of the game
+  const cache=new Map();
+  root.traverse(o=>{
+    if(!o.isMesh) return;
+    const m=o.material;
+    if(!cache.has(m)){
+      if(m.map){ m.map.encoding=THREE.LinearEncoding; m.map.needsUpdate=true; }
+      cache.set(m,new THREE.MeshLambertMaterial({name:m.name,color:m.color,map:m.map||null}));
+    }
+    o.material=cache.get(m); o.castShadow=shadow; o.receiveShadow=true;
+  });
+  return [...cache.values()];
+}
+function dressSide(b){
+  while(b.g.children.length) b.g.remove(b.g.children[0]);
+  const kind=bldKinds[pick(bldKinds.length)], lod=new THREE.LOD();
+  lod.addLevel(kind.clone(),0); lod.addLevel(new THREE.Mesh(kind.userData.far,bldFarMat),BLD_LOD);
+  lod.rotation.y=Math.PI/2; lod.scale.setScalar(BLD_SCALE); // long side runs away from the street
+  b.g.add(lod);
+  const size=new THREE.Box3().setFromObject(kind).getSize(new THREE.Vector3()).multiplyScalar(BLD_SCALE); [size.x,size.z]=[size.z,size.x];
+  b.w=size.x; b.d=size.z; b.model=true;
+}
+function useBuildings(gltf){
+  for(const m of lambertize(gltf.scene,false)) if(m.name==='glass') bldGlass=m;
+  bldKinds=gltf.scene.children.filter(c=>/^b\d+$/.test(c.name));
+  if(!bldKinds.length) return;
+  for(const k of bldKinds){ // the far stand-in: a box the size of the building
+    const s=new THREE.Box3().setFromObject(k).getSize(new THREE.Vector3());
+    k.userData.far=new THREE.BoxGeometry(s.x,s.y,s.z).translate(0,s.y/2,0);
+  }
+  for(const b of sideBlocks){ dressSide(b); placeSide(b,b.g.position.z); }
+  if(bldGlass) bldGlass.emissive.setHex(theme.night?0x7A6030:0x000000);
+}
+function useHeli(gltf){
+  const m=gltf.scene; lambertize(m,false); m.scale.setScalar(HELI_SCALE); // high up, so its shadow wouldn't show anyway
+  while(heli.g.children.length) heli.g.remove(heli.g.children[0]);
+  heli.g.add(m);
+  heli.rotor=m.getObjectByName('TopRotor_y')||heli.rotor;
+  heli.tail=m.getObjectByName('TailRotor_x')||null;
+}
+if(THREE.GLTFLoader && location.protocol!=='file:'){
+  const L=new THREE.GLTFLoader();
+  L.load('models/buildings.glb',useBuildings,undefined,e=>console.warn('buildings.glb not loaded; using box buildings',e));
+  L.load('models/seahawk.glb',useHeli,undefined,e=>console.warn('seahawk.glb not loaded; using the box helicopter',e));
+}
 
 /* ---------- characters: a runner and a police officer, built from boxes ---------- */
 function buildPerson(c){
@@ -1008,7 +1062,7 @@ function updateWorld(dt){
   const rz=Math.round(pz/ROAD_TILE)*ROAD_TILE, rc=rz-ROAD_LEN/2+BEHIND+10;
   road.position.z=rc; alley.position.z=rc; for(const w of walks) w.position.z=rc;
   ground.position.set(0,0,rz-100);
-  for(const b of sideBlocks) if(b.g.position.z-b.d/2>pz+BEHIND){ placeSide(b,b.g.position.z-SIDE_N*SIDE_SLOT); b.ci=pick(PALETTE.length); retint(b); }
+  for(const b of sideBlocks) if(b.g.position.z-b.d/2>pz+BEHIND){ if(b.model) dressSide(b); placeSide(b,b.g.position.z-SIDE_N*SIDE_SLOT); b.ci=pick(PALETTE.length); retint(b); }
   for(const l of lamps) if(l.g.position.z>pz+BEHIND) l.g.position.z-=LAMP_N*LAMP_SLOT;
   for(const c of cars){
     c.g.position.z-=c.dir*c.speed*dt; // model faces +z; dir -1 drives towards -z
@@ -1025,10 +1079,10 @@ function updateWorld(dt){
   coinIM.instanceMatrix.needsUpdate=true;
   if(goal && goal.arrow){ goal.arrow.position.y=goal.top+5.5+Math.abs(Math.sin(now*3))*1.2; goal.arrow.rotation.y=now*2; }
   // helicopter searchlight sweeping just ahead of the runner
-  const hy=game.camY+15;
-  heli.g.position.set(9+Math.sin(now*0.4)*3,hy,pz-26-Math.sin(now*0.3)*4);
+  const hy=game.camY+12;
+  heli.g.position.set(5+Math.sin(now*0.4)*2.5,hy,pz-30-Math.sin(now*0.3)*4);
   const ts=P.s+6+Math.sin(now*0.7)*4, tx=P.x*0.5+Math.sin(now*0.9)*2.5, tu=surfaceAt(ts,tx,0), ty=(tu?tu.top:game.camY)+0.06;
-  heli.g.lookAt(tx,hy,-ts); heli.g.rotateX(0.15); heli.rotor.rotation.y+=dt*25;
+  heli.g.lookAt(tx,hy,-ts); heli.g.rotateX(0.15); heli.rotor.rotation.y+=dt*25; if(heli.tail) heli.tail.rotation.x+=dt*40;
   spot.position.set(tx,ty,-ts);
   beam.position.copy(heli.g.position); beam.lookAt(tx,ty,-ts); beam.scale.z=beam.position.distanceTo(spot.position);
   // snow
